@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>ShaktiSeva - Job Recommendation System</title>
+<style>
+    body {
+        font-family: Arial, sans-serif;
+        max-width: 600px;
+        margin: 50px auto;
+        background: #f4f6f8;
+        padding: 20px;
+    }
+    h1 {
+        color: #2c3e50;
+    }
+    .form-box {
+        background: white;
+        padding: 20px;
+        border-radius: 8px;
+        box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+    }
+    label {
+        display: block;
+        margin-top: 15px;
+        font-weight: bold;
+    }
+    input {
+        width: 100%;
+        padding: 8px;
+        margin-top: 5px;
+        box-sizing: border-box;
+        border: 1px solid #ccc;
+        border-radius: 4px;
+    }
+    button {
+        margin-top: 20px;
+        padding: 10px 20px;
+        background: #2c7be5;
+        color: white;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+    }
+    button:hover {
+        background: #1a5bb8;
+    }
+    #results {
+        margin-top: 25px;
+    }
+    .job-card {
+        background: white;
+        padding: 15px;
+        margin-bottom: 10px;
+        border-radius: 6px;
+        box-shadow: 0 1px 4px rgba(0,0,0,0.1);
+    }
+    .job-title {
+        font-weight: bold;
+        color: #2c3e50;
+    }
+    .score {
+        color: #2c7be5;
+    }
+    .error {
+        color: #d9534f;
+        font-weight: bold;
+    }
+</style>
+</head>
+<body>
+
+<h1>ShaktiSeva Job Recommender</h1>
+
+<div class="form-box">
+    <label for="candidateId">Select Candidate</label>
+     <select id="candidateId"></select>
+
+    <label for="topN">Number of Recommendations</label>
+    <input type="number" id="topN" placeholder="e.g. 3" value="3">
+
+    <button onclick="getRecommendations()">Get Recommendations</button>
+</div>
+
+<div id="results"></div>
+
+<script>
+async function getRecommendations() {
+    const candidateId = document.getElementById("candidateId").value;
+    const topN = document.getElementById("topN").value;
+    const resultsDiv = document.getElementById("results");
+
+    if (!candidateId) {
+        resultsDiv.innerHTML = '<p class="error">Please enter a candidate ID.</p>';
+        return;
+    }
+
+    resultsDiv.innerHTML = "<p>Loading...</p>";
+
+    try {
+        const response = await fetch(`/recommend?candidate_id=${candidateId}&top_n=${topN}`);
+        const data = await response.json();
+
+        if (data.error) {
+            resultsDiv.innerHTML = `<p class="error">${data.error}</p>`;
+            return;
+        }
+
+        if (data.recommendations.length === 0) {
+            resultsDiv.innerHTML = `<p class="error">${data.message || "No suitable jobs found."}</p>`;
+            return;
+        }
+
+        let html = `<h3>Recommendations for Candidate ${data.candidate_id}</h3>`;
+        data.recommendations.forEach(job => {
+            html += `
+                <div class="job-card">
+                    <div class="job-title">${job.title} (Job ID: ${job.job_id})</div>
+                    <div class="score">Match Score: ${job.match_score.toFixed(2)}</div>
+                </div>
+            `;
+        });
+        resultsDiv.innerHTML = html;
+
+    } catch (err) {
+        resultsDiv.innerHTML = '<p class="error">Something went wrong. Check the server console.</p>';
+    }
+}
+</script>
+<div class="form-box" style="margin-top:20px;">
+   <label for="jobIdGap">Select Job</label>
+<select id="jobIdGap"></select>
+    <button onclick="getSkillGap()">Check Skill Gap</button>
+</div>
+<div id="gapResults"></div>
+
+<script>
+async function getSkillGap() {
+    const candidateId = document.getElementById("candidateId").value;
+    const jobId = document.getElementById("jobIdGap").value;
+    const gapDiv = document.getElementById("gapResults");
+
+    if (!candidateId || !jobId) {
+        gapDiv.innerHTML = '<p class="error">Enter both candidate ID and job ID.</p>';
+        return;
+    }
+
+    const response = await fetch(`/skill-gap?candidate_id=${candidateId}&job_id=${jobId}`);
+    const data = await response.json();
+
+    if (data.error) {
+        gapDiv.innerHTML = `<p class="error">${data.error}</p>`;
+        return;
+    }
+
+    gapDiv.innerHTML = `
+        <div class="job-card">
+            <p><b>Matched Skills:</b> ${data.matched_skills.join(", ") || "None"}</p>
+            <p><b>Missing Skills:</b> ${data.missing_skills.join(", ") || "None"}</p>
+            <p><b>Match %:</b> ${data.match_percentage}%</p>
+        </div>
+    `;
+}
+</script>
+<script>
+// Populate candidate dropdown
+async function loadCandidates() {
+    const response = await fetch("/candidates");
+    const candidates = await response.json();
+    const select = document.getElementById("candidateId");
+
+    candidates.forEach(c => {
+        const option = document.createElement("option");
+        option.value = c.candidate_id;
+        option.textContent = `${c.name} (ID: ${c.candidate_id}) - ${c.skills}`;
+        select.appendChild(option);
+    });
+}
+
+// Populate job dropdown
+async function loadJobs() {
+    const response = await fetch("/jobs");
+    const jobs = await response.json();
+    const select = document.getElementById("jobIdGap");
+
+    jobs.forEach(j => {
+        const option = document.createElement("option");
+        option.value = j.job_id;
+        option.textContent = `${j.title} (ID: ${j.job_id})`;
+        select.appendChild(option);
+    });
+}
+
+// Run both when page loads
+loadCandidates();
+loadJobs();
+</script>
+</body>
+</html>
